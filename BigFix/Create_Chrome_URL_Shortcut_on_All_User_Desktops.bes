@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<BES xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="BES.xsd">
+	<Fixlet>
+		<Title>Create Chrome URL Shortcut on All User Desktops</Title>
+		<Description>This fixlet checks the type of Chrome installed (x86 or 64) and gets the path based on that. Then creates a shortcut that opens Chrome directly to the specified webpage. The shortcut is placed in the C:\Users\Public\Desktop folder so it appears on the desktop for all users. </Description>
+		<Relevance>windows of operating system</Relevance>
+		<Category>Configuration</Category>
+		<Source>codymoler</Source>
+		<SourceID>codymoler</SourceID>
+		<SourceReleaseDate>2022-03-21</SourceReleaseDate>
+		<SourceSeverity>Optional</SourceSeverity>
+		<CVENames></CVENames>
+		<SANSID></SANSID>
+		<MIMEField>
+			<Name>x-fixlet-modification-time</Name>
+			<Value>Mon, 21 Mar 2022 20:41:49 +0000</Value>
+		</MIMEField>
+		<Domain>BESC</Domain>
+		<DefaultAction ID="Action1">
+			<Description>
+				<PreLink>Click </PreLink>
+				<Link>here</Link>
+				<PostLink> to deploy this action.</PostLink>
+			</Description>
+			<ActionScript MIMEType="application/x-Fixlet-Windows-Shell"><![CDATA[//Actions to ask the user for the input
+action parameter query "SCName" with description "Enter the name for the icon." with default value "Google"
+action parameter query "SCurl" with description "Enter the URL or path to file" with default value "http://www.google.com"
+parameter "Desktop" = "C:\Users\Public\Desktop"
+action uses wow64 redirection {not x64 of operating system}
+
+//Create the file
+delete __appendfile
+delete makeshortcut.ps1
+appendfile $ChromePath = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe').'(Default)'
+appendfile $Shell = New-Object -ComObject ("WScript.Shell")
+appendfile $ShortCut = $Shell.CreateShortcut("{parameter "Desktop"}\{parameter "SCName"}.lnk")
+appendfile $ShortCut.TargetPath="$ChromePath"
+appendfile $ShortCut.Arguments="{parameter "SCurl"}"
+appendfile $ShortCut.WorkingDirectory = "";
+appendfile $ShortCut.WindowStyle = 1;
+appendfile $ShortCut.Hotkey = "";
+appendfile $ShortCut.Description = "";
+appendfile $ShortCut.Save()
+
+//Execute the file
+move __appendfile makeshortcut.ps1
+waithidden "{pathname of system folder & "\WindowsPowerShell\v1.0\powershell.exe"}" ./makeshortcut.ps1
+]]></ActionScript>
+			<SuccessCriteria Option="RunToCompletion"></SuccessCriteria>
+		</DefaultAction>
+	</Fixlet>
+</BES>
