@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<BES xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="BES.xsd">
+	<Fixlet>
+		<Title>Delete Domain Profiles Older Than 60 Days</Title>
+		<Description>This fixlet will run a PowerShell script that checks if any active directory user accounts have not logged on the device in over 60 days. If so, the user profile will be deleted. </Description>
+		<Relevance>windows of operating system</Relevance>
+		<Category>Maintenance</Category>
+		<Source>codymoler</Source>
+		<SourceID>codymoler</SourceID>
+		<SourceReleaseDate>2022-03-04</SourceReleaseDate>
+		<SourceSeverity></SourceSeverity>
+		<CVENames></CVENames>
+		<SANSID></SANSID>
+		<MIMEField>
+			<Name>x-fixlet-modification-time</Name>
+			<Value>Mon, 07 Mar 2022 21:42:09 +0000</Value>
+		</MIMEField>
+		<Domain>BESC</Domain>
+		<DefaultAction ID="Action1">
+			<Description>
+				<PreLink>Click </PreLink>
+				<Link>here</Link>
+				<PostLink> to deploy this action.</PostLink>
+			</Description>
+			<ActionScript MIMEType="application/x-Fixlet-Windows-Shell">action uses wow64 redirection {not x64 of operating system}
+createfile until _END_
+
+function Get-LocalLogonTime {{
+    param (
+        [Alias('SID')]
+        [string[]] $SidString
+    )
+
+    $RegKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$SidString"
+    #Gather user information from registry key
+    $Raw = Get-ItemProperty -Path $RegKey -Verbose:$false
+    #Calculate logon time value
+    $LocalLogonTime = ([uint64] ($Raw.LocalProfileLoadTimeHigh * ([Math]::Pow(2,32))) + $Raw.LocalProfileLoadTimeLow)
+    #Convert logon time value from filetime to datetime
+    $LocalLogonTime = [datetime]::fromfiletime($LocalLogonTime)
+    #Return the datetime value
+    $LocalLogonTime
+}
+
+function New-DirectorySafe( [string] $Path )
+{{
+    if ( ! ( Test-Path $Path ) ) {{ New-Item -Type Directory -Path $Path | Out-String | Write-Verbose }
+}
+
+#Create libits directory if it does not already exist. The directory will contain a change log.
+new-DirectorySafe "C:\ProgramData\libits"
+
+#Collect the SIDs of all domain users that have logged into this machine.
+$DomainUsers = (Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileGUID" | Get-ItemProperty).SidString
+
+#For each domain user, check if they've logged on in the last 60 days. If not, delete them.
+ForEach ($DomainUser in $DomainUsers) {{
+    $LastLogon = Get-LocalLogonTime -SidString "$DomainUser"
+    If ($LastLogon -lt (Get-Date).AddDays(-60)) {{
+        $UserProfile = Get-WMIObject -class Win32_UserProfile | Where-Object -Property SID -like "$DomainUser"
+        $UserProfile.Delete()
+        $Log = $UserProfile.LocalPath + " has been removed on (" + (Get-Date) + "). They last logged on ($LastLogon)."
+        $Log | Out-File -FilePath "C:\ProgramData\libits\inactive_domain_user_removal.log" -Append
+    }
+}
+
+_END_
+
+delete inactive_domain_user_removal.ps1
+move __createfile inactive_domain_user_removal.ps1
+
+waithidden { pathname of file ((it as string) of value "Path" of key "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell" of native registry) } -ExecutionPolicy Bypass -File inactive_domain_user_removal.ps1</ActionScript>
+			<SuccessCriteria Option="RunToCompletion"></SuccessCriteria>
+		</DefaultAction>
+	</Fixlet>
+</BES>
